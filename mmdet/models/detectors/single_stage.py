@@ -99,13 +99,13 @@ class SingleStageDetector(BaseDetector):
                 corresponds to each class.
         """
         feat = self.extract_feat(img)
-        results_list = self.bbox_head.simple_test(
+        results_list, intermediate = self.bbox_head.simple_test(
             feat, img_metas, rescale=rescale)
         bbox_results = [
             bbox2result(det_bboxes, det_labels, self.bbox_head.num_classes)
             for det_bboxes, det_labels in results_list
         ]
-        return bbox_results
+        return bbox_results, intermediate
 
     def aug_test(self, imgs, img_metas, rescale=False):
         """Test function with test time augmentation.

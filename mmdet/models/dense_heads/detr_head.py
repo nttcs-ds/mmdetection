@@ -701,8 +701,8 @@ class DETRHead(AnchorFreeHead):
         """
         # forward of this head requires img_metas
         outs = self.forward(feats, img_metas)
-        results_list = self.get_bboxes(*outs, img_metas, rescale=rescale)
-        return results_list
+        results_list = self.get_bboxes(*outs[:-1], img_metas, rescale=rescale)
+        return results_list, outs[-1]
 
     def forward_onnx(self, feats, img_metas):
         """Forward function for exporting to ONNX.
