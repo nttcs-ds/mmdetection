@@ -1,8 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from argparse import ArgumentParser
 
-from mmdet.apis import (inference_detector,
-                        init_detector, show_result_pyplot)
+from mmdet.apis import inference_detector, init_detector
 
 
 def parse_args():

@@ -44,7 +44,7 @@ def main():
             (video_reader.width, video_reader.height))
 
     for frame in mmcv.track_iter_progress(video_reader):
-        result = inference_detector(model, frame)
+        result, _ = inference_detector(model, frame)
         frame = model.show_result(frame, result, score_thr=args.score_thr)
         if args.show:
             cv2.namedWindow('video', 0)
