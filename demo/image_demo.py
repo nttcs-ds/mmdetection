@@ -1,7 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from argparse import ArgumentParser
 import numpy
-from os.path import basename
+from os.path import basename, isdir
 from os import chmod, makedirs
 from tqdm import tqdm
 
@@ -71,6 +71,9 @@ def main(args):
     labels_result = []
     bboxes_result = []
     filenames = []
+    if not isdir(args.img_output_dir):
+        makedirs(args.img_output_dir)
+        chmod(args.img_output_dir, 0o755)
     for d in tqdm(img_data):
         result, intermediate = inference_detector(model, d)
         states, labels, bboxes = intermediate
@@ -83,8 +86,9 @@ def main(args):
             show_result(model, f, r,
                         score_thr=args.score_thr, out=out_file)
     result_dir = args.params_output_dir
-    makedirs(result_dir, True)
-    chmod(result_dir, 0o755)
+    if not isdir(result_dir):
+        makedirs(result_dir)
+        chmod(result_dir, 0o755)
     with open(result_dir + "states.npz", "wb") as f:
         numpy.savez(f, numpy.vstack(states_result))
     with open(result_dir + "labels.npz", "wb") as f:
