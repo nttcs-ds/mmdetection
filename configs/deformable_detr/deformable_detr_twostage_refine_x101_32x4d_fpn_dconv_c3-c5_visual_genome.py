@@ -21,22 +21,36 @@ model = dict(
         dcn=dict(type='DCNv2', deform_groups=1, fallback_on_stride=False),
         stage_with_dcn=(False, True, True, True),
         init_cfg=dict(
-            type='Pretrained', checkpoint='open-mmlab://resnext101_32x4d')))
+            type='Pretrained', checkpoint='open-mmlab://resnext101_32x4d')),
+    bbox_head=dict(
+        num_attributes=401,  # 400 + None class.
+        loss_attr=dict(
+            type='FocalLoss',
+            use_sigmoid=True,
+            gamma=2.0,
+            alpha=0.25,
+            loss_weight=1.0)
+    ),
+)
 
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 
 train_pipeline = [
     dict(type='LoadImageFromFile'),
-    dict(type='LoadAnnotations', with_bbox=True),
     dict(
-        type='Albu',
-        transforms=albu_train_transforms,
-        bbox_params=dict(
-            type='BboxParams',
-            format='coco',
-            min_visibility=0.0,
-            filter_lost_elements=True)),
+        type='LoadAnnotations',
+        with_bbox=True,
+        with_attributes=True),
+    # dict(
+    #     type='Albu',
+    #     transforms=albu_train_transforms,
+    #     bbox_params=dict(
+    #         type='BboxParams',
+    #         format='coco',
+    #         min_visibility=0.0,
+    #         label_fields=["gt_labels", "gt_attributes"]
+    #         )),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(
         type='AutoAugment',
@@ -78,5 +92,13 @@ train_pipeline = [
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=1),
     dict(type='DefaultFormatBundle'),
-    dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels'])
+    dict(type='ToTensor', keys=['gt_attributes']),
+    dict(type='ToDataContainer', fields=[
+        dict(key='gt_attributes')]),
+    dict(type='Collect', keys=['img', 'gt_bboxes',
+                               'gt_labels', 'gt_attributes'])
 ]
+
+data = dict(
+    train=dict(filter_empty_gt=False, pipeline=train_pipeline),
+)

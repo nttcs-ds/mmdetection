@@ -2,6 +2,7 @@
 import itertools
 import logging
 import os.path as osp
+import random
 import tempfile
 import warnings
 from collections import OrderedDict
@@ -50,6 +51,7 @@ class CocoDataset(CustomDataset):
         # change with the order of the CLASSES
         self.cat_ids = self.coco.get_cat_ids(cat_names=self.CLASSES)
 
+        self.num_attributes = 400  # VG only
         self.cat2label = {cat_id: i for i, cat_id in enumerate(self.cat_ids)}
         self.img_ids = self.coco.get_img_ids()
         data_infos = []
@@ -132,6 +134,7 @@ class CocoDataset(CustomDataset):
         """
         gt_bboxes = []
         gt_labels = []
+        gt_attributes = []
         gt_bboxes_ignore = []
         gt_masks_ann = []
         for i, ann in enumerate(ann_info):
@@ -152,14 +155,20 @@ class CocoDataset(CustomDataset):
             else:
                 gt_bboxes.append(bbox)
                 gt_labels.append(self.cat2label[ann['category_id']])
+                if 'attribute_ids' in ann.keys():
+                    gt_attributes.append(random.choice(ann['attribute_ids']))
+                else:
+                    gt_attributes.append(self.num_attributes)
                 gt_masks_ann.append(ann.get('segmentation', None))
 
         if gt_bboxes:
             gt_bboxes = np.array(gt_bboxes, dtype=np.float32)
             gt_labels = np.array(gt_labels, dtype=np.int64)
+            gt_attributes = np.array(gt_attributes, dtype=np.int64)
         else:
             gt_bboxes = np.zeros((0, 4), dtype=np.float32)
             gt_labels = np.array([], dtype=np.int64)
+            gt_attributes = np.array([], dtype=np.int64)
 
         if gt_bboxes_ignore:
             gt_bboxes_ignore = np.array(gt_bboxes_ignore, dtype=np.float32)
@@ -171,6 +180,7 @@ class CocoDataset(CustomDataset):
         ann = dict(
             bboxes=gt_bboxes,
             labels=gt_labels,
+            attributes=gt_attributes,
             bboxes_ignore=gt_bboxes_ignore,
             masks=gt_masks_ann,
             seg_map=seg_map)

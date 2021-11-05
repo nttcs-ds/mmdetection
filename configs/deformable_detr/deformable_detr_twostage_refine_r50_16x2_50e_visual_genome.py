@@ -1623,4 +1623,4 @@ data = dict(
         ann_file='/data/christopher/images/vgcoco/annotations/visual_genome_test.json'),
     samples_per_gpu=2,
     workers_per_gpu=2,
-    )
+)

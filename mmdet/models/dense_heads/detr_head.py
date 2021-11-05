@@ -66,6 +66,14 @@ class DETRHead(AnchorFreeHead):
                      use_sigmoid=False,
                      loss_weight=1.0,
                      class_weight=1.0),
+                 num_attributes=400,
+                 sync_attr_avg_factor=False,
+                 loss_attr=dict(
+                     type='CrossEntropyLoss',
+                     bg_attr_weight=0.1,
+                     use_sigmoid=False,
+                     loss_weight=1.0,
+                     class_weight=1.0),
                  loss_bbox=dict(type='L1Loss', loss_weight=5.0),
                  loss_iou=dict(type='GIoULoss', loss_weight=2.0),
                  train_cfg=dict(
@@ -103,6 +111,27 @@ class DETRHead(AnchorFreeHead):
                 loss_cls.pop('bg_cls_weight')
             self.bg_cls_weight = bg_cls_weight
 
+        self.bg_attr_weight = 0
+        self.sync_attr_avg_factor = sync_attr_avg_factor
+        attribute_weight = loss_attr.get('attribute_weight', None)
+        if attribute_weight is not None and (self.__class__ is DETRHead):
+            assert isinstance(attribute_weight, float), 'Expected ' \
+                'attribute_weight to have type float. Found ' \
+                f'{type(attribute_weight)}.'
+            # NOTE following the official DETR rep0, bg_attr_weight means
+            # relative classification weight of the no-object class.
+            bg_attr_weight = loss_attr.get('bg_attr_weight', attribute_weight)
+            assert isinstance(bg_attr_weight, float), 'Expected ' \
+                'bg_attr_weight to have type float. Found ' \
+                f'{type(bg_attr_weight)}.'
+            attribute_weight = torch.ones(num_attributes + 1) * attribute_weight
+            # set background class as the last indice
+            attribute_weight[num_attributes] = bg_attr_weight
+            loss_attr.update({'attribute_weight': attribute_weight})
+            if 'bg_attr_weight' in loss_attr:
+                loss_attr.pop('bg_attr_weight')
+            self.bg_attr_weight = bg_attr_weight
+
         if train_cfg:
             assert 'assigner' in train_cfg, 'assigner should be provided '\
                 'when train_cfg is set.'
@@ -122,12 +151,14 @@ class DETRHead(AnchorFreeHead):
             self.sampler = build_sampler(sampler_cfg, context=self)
         self.num_query = num_query
         self.num_classes = num_classes
+        self.num_attributes = num_attributes
         self.in_channels = in_channels
         self.num_reg_fcs = num_reg_fcs
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
         self.fp16_enabled = False
         self.loss_cls = build_loss(loss_cls)
+        self.loss_attr = build_loss(loss_attr)
         self.loss_bbox = build_loss(loss_bbox)
         self.loss_iou = build_loss(loss_iou)
 
@@ -135,6 +166,7 @@ class DETRHead(AnchorFreeHead):
             self.cls_out_channels = num_classes
         else:
             self.cls_out_channels = num_classes + 1
+        self.attr_out_channels = num_attributes
         self.act_cfg = transformer.get('act_cfg',
                                        dict(type='ReLU', inplace=True))
         self.activate = build_activation_layer(self.act_cfg)
