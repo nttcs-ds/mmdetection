@@ -299,6 +299,56 @@ class DeformableDETRHead(DETRHead):
             num_dec_layer += 1
         return loss_dict
 
+    @force_fp32(apply_to=('all_cls_scores_list', 'all_bbox_preds_list'))
+    def get_bboxes(self,
+                   all_cls_scores,
+                   all_bbox_preds,
+                   enc_cls_scores,
+                   enc_bbox_preds,
+                   img_metas,
+                   rescale=False):
+        """Transform network outputs for a batch into bbox predictions.
+        Args:
+            all_cls_scores (Tensor): Classification score of all
+                decoder layers, has shape
+                [nb_dec, bs, num_query, cls_out_channels].
+            all_bbox_preds (Tensor): Sigmoid regression
+                outputs of all decode layers. Each is a 4D-tensor with
+                normalized coordinate format (cx, cy, w, h) and shape
+                [nb_dec, bs, num_query, 4].
+            enc_cls_scores (Tensor): Classification scores of
+                points on encode feature map , has shape
+                (N, h*w, num_classes). Only be passed when as_two_stage is
+                True, otherwise is None.
+            enc_bbox_preds (Tensor): Regression results of each points
+                on the encode feature map, has shape (N, h*w, 4). Only be
+                passed when as_two_stage is True, otherwise is None.
+            img_metas (list[dict]): Meta information of each image.
+            rescale (bool, optional): If True, return boxes in original
+                image space. Default False.
+        Returns:
+            list[list[Tensor, Tensor]]: Each item in result_list is 2-tuple. \
+                The first item is an (n, 5) tensor, where the first 4 columns \
+                are bounding box positions (tl_x, tl_y, br_x, br_y) and the \
+                5-th column is a score between 0 and 1. The second item is a \
+                (n,) tensor where each item is the predicted class label of \
+                the corresponding box.
+        """
+        cls_scores = all_cls_scores[-1]
+        bbox_preds = all_bbox_preds[-1]
+
+        result_list = []
+        for img_id in range(len(img_metas)):
+            cls_score = cls_scores[img_id]
+            bbox_pred = bbox_preds[img_id]
+            img_shape = img_metas[img_id]['img_shape']
+            scale_factor = img_metas[img_id]['scale_factor']
+            proposals = self._get_bboxes_single(cls_score, bbox_pred,
+                                                img_shape, scale_factor,
+                                                rescale)
+            result_list.append(proposals)
+        return result_list
+
     def forward_train(self,
                       x,
                       img_metas,
@@ -355,9 +405,10 @@ class DeformableDETRHead(DETRHead):
         """
         # forward of this head requires img_metas
         outs = self.forward_base(feats, img_metas)
-        results_list = self.get_bboxes(*outs[:-1], img_metas, rescale=rescale)
-        return results_list, outs[-1], (outs[-1], outs[0][-1],
-                                        outs[1][-1], outs[2][-1], outs[3][-1])
+        results_list = self.get_bboxes(*(outs[0], outs[1], outs[3], outs[4]),
+                                       img_metas, rescale=rescale)
+        return results_list, (outs[-1], outs[0][-1],
+                              outs[1][-1], outs[2][-1], outs[3][-1])
 
     def loss_single_attr(self,
                          cls_scores,
