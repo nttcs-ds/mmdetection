@@ -23,10 +23,12 @@ def main(args):
     # states = [batch, query, dim]
     # labels = [batch, query, cls]
     # bboxes = [batch, query, 4]
-    states, labels, bboxes = intermediate
+    # attributes = [batch, query, attr]
+    states, labels, bboxes, attrs = intermediate
     print(f"states.shape:{states.shape}")
     print(f"labels.shape:{labels.shape}")
     print(f"bboxes.shape:{bboxes.shape}")
+    print(f"attrs.shape:{attrs.shape}")
 
 
 if __name__ == '__main__':

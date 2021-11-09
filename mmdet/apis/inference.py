@@ -149,7 +149,8 @@ def inference_detector(model, imgs):
     if not is_batch:
         return results[0], (intermediate[0][0],
                             intermediate[1][0],
-                            intermediate[2][0])
+                            intermediate[2][0],
+                            intermediate[3][0])
     else:
         return results, intermediate
 

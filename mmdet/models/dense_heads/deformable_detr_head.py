@@ -408,7 +408,7 @@ class DeformableDETRHead(DETRHead):
         results_list = self.get_bboxes(*(outs[0], outs[1], outs[3], outs[4]),
                                        img_metas, rescale=rescale)
         return results_list, (outs[-1], outs[0][-1],
-                              outs[1][-1], outs[2][-1], outs[3][-1])
+                              outs[1][-1], outs[2][-1])
 
     def loss_single_attr(self,
                          cls_scores,
