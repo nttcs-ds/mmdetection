@@ -72,14 +72,16 @@ class DeformableDETRHead(DETRHead):
 
         if self.with_box_refine:
             self.cls_branches = _get_clones(fc_cls, num_pred)
-            self.attr_branches = _get_clones(fc_attr, num_pred)
+            self.attr_branches \
+                = _get_clones(fc_attr,
+                              self.transformer.decoder.num_layers)
             self.reg_branches = _get_clones(reg_branch, num_pred)
         else:
 
             self.cls_branches = nn.ModuleList(
                 [fc_cls for _ in range(num_pred)])
             self.attr_branches = nn.ModuleList(
-                 [fc_attr for _ in range(num_pred)])
+                 [fc_attr for _ in range(self.transformer.decoder.num_layers)])
             self.reg_branches = nn.ModuleList(
                 [reg_branch for _ in range(num_pred)])
 
@@ -106,6 +108,10 @@ class DeformableDETRHead(DETRHead):
                 nn.init.constant_(m[-1].bias.data[2:], 0.0)
 
     def forward(self, mlvl_feats, img_metas):
+        outs = self.forward_base(mlvl_feats, img_metas)
+        return outs[:-1]
+
+    def forward_base(self, mlvl_feats, img_metas):
         """Forward function.
 
         Args:
@@ -190,14 +196,10 @@ class DeformableDETRHead(DETRHead):
         if self.as_two_stage:
             return outputs_classes, outputs_coords, outputs_attributes, \
                 enc_outputs_class, \
-                enc_outputs_coord.sigmoid(), \
-                (hs[-1], outputs_classes[-1],
-                 outputs_coords[-1], outputs_attributes)
+                enc_outputs_coord.sigmoid(), hs
         else:
             return outputs_classes, outputs_coords, outputs_attributes, \
-                None, None, \
-                (hs[-1], outputs_classes[-1],
-                 outputs_coords[-1], outputs_attributes)
+                None, None, hs
 
     @force_fp32(apply_to=('all_cls_scores_list', 'all_bbox_preds_list'))
     def loss(self,
@@ -327,12 +329,35 @@ class DeformableDETRHead(DETRHead):
         assert proposal_cfg is None, '"proposal_cfg" must be None'
         outs = self(x, img_metas)
         if gt_labels is None:
-            loss_inputs = outs[:-1] + (gt_bboxes, img_metas)
+            loss_inputs = outs + (gt_bboxes, img_metas)
         else:
-            loss_inputs = outs[:-1] + (gt_bboxes, gt_labels,
-                                       gt_attributes, img_metas)
+            loss_inputs = outs + (gt_bboxes, gt_labels,
+                                  gt_attributes, img_metas)
         losses = self.loss(*loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
         return losses
+
+    def simple_test_bboxes(self, feats, img_metas, rescale=False):
+        """Test det bboxes without test-time augmentation.
+
+        Args:
+            feats (tuple[torch.Tensor]): Multi-level features from the
+                upstream network, each is a 4D-tensor.
+            img_metas (list[dict]): List of image information.
+            rescale (bool, optional): Whether to rescale the results.
+                Defaults to False.
+
+        Returns:
+            list[tuple[Tensor, Tensor]]: Each item in result_list is 2-tuple.
+                The first item is ``bboxes`` with shape (n, 5),
+                where 5 represent (tl_x, tl_y, br_x, br_y, score).
+                The shape of the second tensor in the tuple is ``labels``
+                with shape (n,)
+        """
+        # forward of this head requires img_metas
+        outs = self.forward_base(feats, img_metas)
+        results_list = self.get_bboxes(*outs[:-1], img_metas, rescale=rescale)
+        return results_list, outs[-1], (outs[-1], outs[0][-1],
+                                        outs[1][-1], outs[2][-1], outs[3][-1])
 
     def loss_single_attr(self,
                          cls_scores,
