@@ -49,6 +49,7 @@ def main(args):
     states_result = []
     labels_result = []
     bboxes_result = []
+    attr_result = []
     filenames = []
     start = len(data) * args.chunk_id // CHUNK_NUM
     end = len(data) * (args.chunk_id + 1) // CHUNK_NUM
@@ -57,11 +58,13 @@ def main(args):
         # states = [batch, query, dim]
         # labels = [batch, query, cls]
         # bboxes = [batch, query, 4]
-        states, labels, bboxes = intermediate
+        # attributes = [batch, query, attr]
+        states, labels, bboxes, attr = intermediate
         filenames.extend(d)
         states_result.append(states.to('cpu').detach().numpy().copy())
         labels_result.append(labels.to('cpu').detach().numpy().copy())
         bboxes_result.append(bboxes.to('cpu').detach().numpy().copy())
+        attr_result.append(attr.to('cpu').detach().numpy().copy())
     result_dir = f"{args.output_dir}/{args.chunk_id}/"
     makedirs(result_dir, True)
     chmod(result_dir, 0o755)
@@ -71,6 +74,8 @@ def main(args):
         numpy.savez(f, numpy.vstack(labels_result))
     with open(result_dir + "bboxes.npz", "wb") as f:
         numpy.savez(f, numpy.vstack(bboxes_result))
+    with open(result_dir + "attr.npz", "wb") as f:
+        numpy.savez(f, numpy.vstack(attr_result))
     with open(result_dir + "filenames.txt", "w") as f:
         for fname in filenames:
             f.write(basename(fname) + "\n")

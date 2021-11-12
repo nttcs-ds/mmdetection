@@ -196,10 +196,10 @@ class DeformableDETRHead(DETRHead):
         if self.as_two_stage:
             return outputs_classes, outputs_coords, outputs_attributes, \
                 enc_outputs_class, \
-                enc_outputs_coord.sigmoid(), hs
+                enc_outputs_coord.sigmoid(), hs[-1]
         else:
             return outputs_classes, outputs_coords, outputs_attributes, \
-                None, None, hs
+                None, None, hs[-1]
 
     @force_fp32(apply_to=('all_cls_scores_list', 'all_bbox_preds_list'))
     def loss(self,
